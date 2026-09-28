@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MechVision — Mechanical Drawing Analyser</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="#000" stroke-width="1.5">
+          <circle cx="8" cy="8" r="5"/><line x1="8" y1="1" x2="8" y2="4"/><line x1="8" y1="12" x2="8" y2="15"/>
+          <line x1="1" y1="8" x2="4" y2="8"/><line x1="12" y1="8" x2="15" y2="8"/>
+        </svg>
+      </div>
+      Mech<span>Vision</span>
+    </div>
+    <div class="topbar-sep"></div>
+    <button class="topbar-btn active" onclick="setMode('analyse')">⬡ Analyse</button>
+    <button class="topbar-btn" onclick="setMode('compare')">⊞ Compare</button>
+    <button class="topbar-btn" onclick="setMode('export')">↑ Export BOM</button>
+    <div class="topbar-sep"></div>
+    <button class="upload-main-btn" onclick="openUploadModal()">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="8" width="12" height="5" rx="1"/><path d="M4 5L7 2l3 3"/><line x1="7" y1="2" x2="7" y2="9"/></svg>
+      Upload Drawing
+    </button>
+    <div class="topbar-sep"></div>
+    <button class="topbar-btn" onclick="runScan()">▶ Run Scan</button>
+    <div class="topbar-right">
+      <div class="status-dot"></div>
+      <span class="status-text">ML Engine — Online</span>
+      <div class="topbar-sep"></div>
+      <span class="status-text" id="part-count">23 parts detected</span>
+    </div>
+  </header>
+
+  <!-- SIDEBAR LEFT -->
+  <aside class="sidebar-left">
+    <div class="sl-section">
+      <div class="sl-title">Active Models</div>
+      <div class="model-card active" onclick="toggleModel(this,'YOLOv8-Mech')">
+        <div class="mc-header"><div class="mc-indicator"></div><div class="mc-name">YOLOv8-Mech</div></div>
+        <div class="mc-type">Supervised · Object Detection</div>
+        <div class="mc-bar-wrap"><div class="mc-bar"><div class="mc-fill" style="width:94%;background:#00e5ff"></div></div><div class="mc-pct">94%</div></div>
+      </div>
+      <div class="model-card active" onclick="toggleModel(this,'ResNet-Classify')">
+        <div class="mc-header"><div class="mc-indicator"></div><div class="mc-name">ResNet-Classify</div></div>
+        <div class="mc-type">Supervised · Classification</div>
+        <div class="mc-bar-wrap"><div class="mc-bar"><div class="mc-fill" style="width:89%;background:#00e5ff"></div></div><div class="mc-pct">89%</div></div>
+      </div>
+      <div class="model-card" onclick="toggleModel(this,'DBSCAN-Cluster')">
+        <div class="mc-header"><div class="mc-indicator"></div><div class="mc-name">DBSCAN-Cluster</div></div>
+        <div class="mc-type">Unsupervised · Clustering</div>
+        <div class="mc-bar-wrap"><div class="mc-bar"><div class="mc-fill" style="width:76%;background:#7c3aed"></div></div><div class="mc-pct">76%</div></div>
+      </div>
+      <div class="model-card" onclick="toggleModel(this,'AutoEncoder-AD')">
+        <div class="mc-header"><div class="mc-indicator"></div><div class="mc-name">AutoEncoder-AD</div></div>
+        <div class="mc-type">Unsupervised · Anomaly Detection</div>
+        <div class="mc-bar-wrap"><div class="mc-bar"><div class="mc-fill" style="width:82%;background:#7c3aed"></div></div><div class="mc-pct">82%</div></div>
+      </div>
+      <div class="model-card" onclick="toggleModel(this,'ActiveLearn-RL')">
+        <div class="mc-header"><div class="mc-indicator"></div><div class="mc-name">ActiveLearn-RL</div></div>
+        <div class="mc-type">Self-Learning · Active Loop</div>
+        <div class="mc-bar-wrap"><div class="mc-bar"><div class="mc-fill" style="width:67%;background:#f59e0b"></div></div><div class="mc-pct">67%</div></div>
+      </div>
+    </div>
+
+    <div class="confidence-gauge">
+      <div class="sl-title">Overall Confidence</div>
+      <div class="gauge-ring">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="30" fill="none" stroke="#222733" stroke-width="7"/>
+          <circle id="gauge-circle" cx="40" cy="40" r="30" fill="none" stroke="#00e5ff" stroke-width="7" stroke-linecap="round" stroke-dasharray="188.5" stroke-dashoffset="38" style="transition:stroke-dashoffset 1s"/>
+        </svg>
+        <div class="gauge-val" id="gauge-val">88%</div>
+      </div>
+      <div class="gauge-label">Fusion Model Score</div>
+    </div>
+
+    <div class="algo-list">
+      <div class="sl-title">Algorithm Status</div>
+      <div class="algo-row">
+        <div class="algo-dot" style="background:#00e5ff"></div>
+        <div class="algo-name">YOLOv8 Detection</div>
+        <div class="algo-tag" style="background:rgba(0,229,255,.1);color:#00e5ff">Running</div>
+      </div>
+      <div class="algo-row">
+        <div class="algo-dot" style="background:#00e5ff"></div>
+        <div class="algo-name">OCR Dimension Read</div>
+        <div class="algo-tag" style="background:rgba(0,229,255,.1);color:#00e5ff">Running</div>
+      </div>
+      <div class="algo-row">
+        <div class="algo-dot" style="background:#7c3aed"></div>
+        <div class="algo-name">DBSCAN Cluster</div>
+        <div class="algo-tag" style="background:rgba(124,58,237,.1);color:#7c3aed">Idle</div>
+      </div>
+      <div class="algo-row">
+        <div class="algo-dot" style="background:#f59e0b"></div>
+        <div class="algo-name">Active Learning</div>
+        <div class="algo-tag" style="background:rgba(245,158,11,.1);color:#f59e0b">Waiting</div>
+      </div>
+      <div class="algo-row">
+        <div class="algo-dot" style="background:#10b981"></div>
+        <div class="algo-name">GNN Relations</div>
+        <div class="algo-tag" style="background:rgba(16,185,129,.1);color:#10b981">Done</div>
+      </div>
+      <div class="algo-row">
+        <div class="algo-dot" style="background:#10b981"></div>
+        <div class="algo-name">EWC Continual</div>
+        <div class="algo-tag" style="background:rgba(16,185,129,.1);color:#10b981">Done</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- CANVAS AREA -->
+  <main class="canvas-area">
+    <div class="canvas-wrap" id="canvas-wrap">
+      <!-- Main SVG Drawing -->
+      <svg id="main-svg" viewBox="0 0 800 580" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#c8c0a8" stroke-width="0.3"/>
+          </pattern>
+        </defs>
+        <!-- Grid background -->
+        <rect width="800" height="580" fill="#f5f0e8"/>
+        <rect width="800" height="580" fill="url(#grid)"/>
+
+        <!-- Title block -->
+        <rect x="560" y="430" width="220" height="130" fill="none" stroke="#444" stroke-width="1"/>
+        <line x1="560" y1="458" x2="780" y2="458" stroke="#444" stroke-width="0.5"/>
+        <line x1="560" y1="480" x2="780" y2="480" stroke="#444" stroke-width="0.5"/>
+        <line x1="560" y1="502" x2="780" y2="502" stroke="#444" stroke-width="0.5"/>
+        <line x1="670" y1="458" x2="670" y2="560" stroke="#444" stroke-width="0.5"/>
+        <text x="670" y="448" text-anchor="middle" font-family="monospace" font-size="10" fill="#222" font-weight="bold">ASSEMBLY DRAWING</text>
+        <text x="615" y="472" text-anchor="middle" font-family="monospace" font-size="8" fill="#444">DRAWN BY</text>
+        <text x="725" y="472" text-anchor="middle" font-family="monospace" font-size="8" fill="#444">CHECKED</text>
+        <text x="615" y="490" text-anchor="middle" font-family="monospace" font-size="9" fill="#222">ENG-TEAM</text>
+        <text x="725" y="490" text-anchor="middle" font-family="monospace" font-size="9" fill="#222">QA-2024</text>
+        <text x="615" y="514" text-anchor="middle" font-family="monospace" font-size="8" fill="#444">SCALE</text>
+        <text x="725" y="514" text-anchor="middle" font-family="monospace" font-size="8" fill="#444">DWG NO</text>
+        <text x="615" y="528" text-anchor="middle" font-family="monospace" font-size="9" fill="#222">1:2</text>
+        <text x="725" y="528" text-anchor="middle" font-family="monospace" font-size="9" fill="#222">MV-2024-001</text>
+        <text x="670" y="548" text-anchor="middle" font-family="monospace" font-size="8" fill="#444">MATERIAL: STEEL ALLOY 4140</text>
+
+        <!-- Main shaft body -->
+        <rect id="p-shaft" x="100" y="220" width="380" height="80" fill="none" stroke="#222" stroke-width="1.5" class="part-highlight" data-part="shaft"/>
+        <!-- Shaft center line -->
+        <line x1="80" y1="260" x2="510" y2="260" stroke="#555" stroke-width="0.5" stroke-dasharray="8,4"/>
+        <!-- Left bearing journal -->
+        <rect id="p-lbj" x="100" y="230" width="60" height="60" fill="none" stroke="#333" stroke-width="1.2" class="part-highlight" data-part="lbearingjournal"/>
+        <!-- Right bearing journal -->
+        <rect id="p-rbj" x="420" y="230" width="60" height="60" fill="none" stroke="#333" stroke-width="1.2" class="part-highlight" data-part="rbearingjournal"/>
+
+        <!-- Left bearing housing -->
+        <ellipse id="p-lbearing" cx="130" cy="260" rx="40" ry="55" fill="none" stroke="#222" stroke-width="1.5" class="part-highlight" data-part="lbearing"/>
+        <!-- Right bearing housing -->
+        <ellipse id="p-rbearing" cx="450" cy="260" rx="40" ry="55" fill="none" stroke="#222" stroke-width="1.5" class="part-highlight" data-part="rbearing"/>
+
+        <!-- Gear -->
+        <g id="p-gear" class="part-highlight" data-part="gear">
+          <circle cx="260" cy="260" r="70" fill="none" stroke="#222" stroke-width="1.5"/>
+          <circle cx="260" cy="260" r="50" fill="none" stroke="#333" stroke-width="0.8"/>
+          <circle cx="260" cy="260" r="20" fill="none" stroke="#333" stroke-width="1"/>
+          <!-- gear teeth representation -->
+          <line x1="260" y1="188" x2="260" y2="200" stroke="#333" stroke-width="3"/>
+          <line x1="260" y1="320" x2="260" y2="332" stroke="#333" stroke-width="3"/>
+          <line x1="188" y1="260" x2="200" y2="260" stroke="#333" stroke-width="3"/>
+          <line x1="320" y1="260" x2="332" y2="260" stroke="#333" stroke-width="3"/>
+          <line x1="211" y1="211" x2="220" y2="220" stroke="#333" stroke-width="3"/>
+          <line x1="300" y1="300" x2="309" y2="309" stroke="#333" stroke-width="3"/>
+          <line x1="309" y1="211" x2="300" y2="220" stroke="#333" stroke-width="3"/>
+          <line x1="211" y1="309" x2="220" y2="300" stroke="#333" stroke-width="3"/>
+        </g>
+
+        <!-- Keyway -->
+        <rect id="p-keyway" x="230" y="220" width="60" height="12" fill="none" stroke="#444" stroke-width="1" stroke-dasharray="3,2" class="part-highlight" data-part="keyway"/>
+        <text x="260" y="214" text-anchor="middle" font-family="monospace" font-size="8" fill="#444">KEYWAY</text>
+
+        <!-- Bolt hole group (4 bolts) -->
+        <circle id="p-bolt1" cx="240" cy="240" r="8" fill="none" stroke="#444" stroke-width="1" class="part-highlight" data-part="bolt"/>
+        <circle cx="240" cy="240" r="3" fill="none" stroke="#666" stroke-width="0.8"/>
+        <circle id="p-bolt2" cx="280" cy="240" r="8" fill="none" stroke="#444" stroke-width="1" class="part-highlight" data-part="bolt"/>
+        <circle cx="280" cy="240" r="3" fill="none" stroke="#666" stroke-width="0.8"/>
+        <circle id="p-bolt3" cx="240" cy="280" r="8" fill="none" stroke="#444" stroke-width="1" class="part-highlight" data-part="bolt"/>
+        <circle cx="240" cy="280" r="3" fill="none" stroke="#666" stroke-width="0.8"/>
+        <circle id="p-bolt4" cx="280" cy="280" r="8" fill="none" stroke="#444" stroke-width="1" class="part-highlight" data-part="bolt"/>
+        <circle cx="280" cy="280" r="3" fill="none" stroke="#666" stroke-width="0.8"/>
+
+        <!-- Collar/flange left -->
+        <rect id="p-flange-l" x="155" y="210" width="30" height="100" fill="none" stroke="#222" stroke-width="1.2" class="part-highlight" data-part="flangeL"/>
+        <!-- Collar/flange right -->
+        <rect id="p-flange-r" x="395" y="210" width="30" height="100" fill="none" stroke="#222" stroke-width="1.2" class="part-highlight" data-part="flangeR"/>
+
+        <!-- Seal groove left -->
+        <rect id="p-sealL" x="158" y="222" width="8" height="76" fill="none" stroke="#555" stroke-width="0.8" stroke-dasharray="2,2" class="part-highlight" data-part="sealL"/>
+        <rect id="p-sealR" x="414" y="222" width="8" height="76" fill="none" stroke="#555" stroke-width="0.8" stroke-dasharray="2,2" class="part-highlight" data-part="sealR"/>
+
+        <!-- Threaded end left -->
+        <rect id="p-threadL" x="60" y="242" width="42" height="36" fill="none" stroke="#222" stroke-width="1.2" class="part-highlight" data-part="threadL"/>
+        <line x1="65" y1="248" x2="98" y2="248" stroke="#444" stroke-width="0.5"/>
+        <line x1="65" y1="254" x2="98" y2="254" stroke="#444" stroke-width="0.5"/>
+        <line x1="65" y1="260" x2="98" y2="260" stroke="#444" stroke-width="0.5"/>
+        <line x1="65" y1="266" x2="98" y2="266" stroke="#444" stroke-width="0.5"/>
+        <line x1="65" y1="272" x2="98" y2="272" stroke="#444" stroke-width="0.5"/>
+
+        <!-- Threaded end right -->
+        <rect id="p-threadR" x="478" y="242" width="42" height="36" fill="none" stroke="#222" stroke-width="1.2" class="part-highlight" data-part="threadR"/>
+        <line x1="482" y1="248" x2="515" y2="248" stroke="#444" stroke-width="0.5"/>
+        <line x1="482" y1="254" x2="515" y2="254" stroke="#444" stroke-width="0.5"/>
+        <line x1="482" y1="260" x2="515" y2="260" stroke="#444" stroke-width="0.5"/>
+        <line x1="482" y1="266" x2="515" y2="266" stroke="#444" stroke-width="0.5"/>
+        <line x1="482" y1="272" x2="515" y2="272" stroke="#444" stroke-width="0.5"/>
+
+        <!-- DIMENSION LINES -->
+        <!-- Total length dim -->
+        <line x1="60" y1="340" x2="520" y2="340" stroke="#555" stroke-width="0.6"/>
+        <line x1="60" y1="335" x2="60" y2="345" stroke="#555" stroke-width="0.6"/>
+        <line x1="520" y1="335" x2="520" y2="345" stroke="#555" stroke-width="0.6"/>
+        <text x="290" y="355" text-anchor="middle" font-family="monospace" font-size="9" fill="#333">460 mm</text>
+
+        <!-- Gear diameter dim -->
+        <line x1="260" y1="188" x2="260" y2="175" stroke="#555" stroke-width="0.6"/>
+        <line x1="260" y1="332" x2="260" y2="345" stroke="#555" stroke-width="0.6"/>
+        <line x1="255" y1="178" x2="190" y2="178" stroke="#555" stroke-width="0.6"/>
+        <text x="180" y="182" text-anchor="end" font-family="monospace" font-size="9" fill="#333">Ø140</text>
+
+        <!-- Shaft diameter dim -->
+        <line x1="540" y1="220" x2="560" y2="220" stroke="#555" stroke-width="0.6"/>
+        <line x1="540" y1="300" x2="560" y2="300" stroke="#555" stroke-width="0.6"/>
+        <line x1="550" y1="220" x2="550" y2="300" stroke="#555" stroke-width="0.6"/>
+        <text x="555" y="263" font-family="monospace" font-size="9" fill="#333">Ø80</text>
+
+        <!-- Part labels / balloons -->
+        <circle cx="130" cy="160" r="12" fill="none" stroke="#444" stroke-width="0.8"/>
+        <text x="130" y="164" text-anchor="middle" font-family="monospace" font-size="9" fill="#333">1</text>
+        <line x1="130" y1="172" x2="130" y2="205" stroke="#444" stroke-width="0.5" stroke-dasharray="3,2"/>
+
+        <circle cx="260" cy="145" r="12" fill="none" stroke="#444" stroke-width="0.8"/>
+        <text x="260" y="149" text-anchor="middle" font-family="monospace" font-size="9" fill="#333">2</text>
+        <line x1="260" y1="157" x2="260" y2="188" stroke="#444" stroke-width="0.5" stroke-dasharray="3,2"/>
+
+        <circle cx="450" cy="160" r="12" fill="none" stroke="#444" stroke-width="0.8"/>
+        <text x="450" y="164" text-anchor="middle" font-family="monospace" font-size="9" fill="#333">3</text>
+        <line x1="450" y1="172" x2="450" y2="204" stroke="#444" stroke-width="0.5" stroke-dasharray="3,2"/>
+
+        <circle cx="185" cy="165" r="12" fill="none" stroke="#444" stroke-width="0.8"/>
+        <text x="185" y="169" text-anchor="middle" font-family="monospace" font-size="9" fill="#333">4</text>
+        <line x1="185" y1="177" x2="185" y2="210" stroke="#444" stroke-width="0.5" stroke-dasharray="3,2"/>
+
+        <circle cx="80" cy="195" r="12" fill="none" stroke="#444" stroke-width="0.8"/>
+        <text x="80" y="199" text-anchor="middle" font-family="monospace" font-size="9" fill="#333">5</text>
+        <line x1="80" y1="207" x2="80" y2="242" stroke="#444" stroke-width="0.5" stroke-dasharray="3,2"/>
+
+        <!-- Surface finish symbol -->
+        <text x="310" y="216" font-family="monospace" font-size="10" fill="#444">√ Ra 1.6</text>
+        <text x="390" y="216" font-family="monospace" font-size="10" fill="#444">√ Ra 0.8</text>
+
+        <!-- Tolerance note -->
+        <text x="100" y="400" font-family="monospace" font-size="8" fill="#555">GENERAL TOLERANCES: ISO 2768-mK</text>
+        <text x="100" y="412" font-family="monospace" font-size="8" fill="#555">UNLESS OTHERWISE STATED</text>
+        <text x="100" y="424" font-family="monospace" font-size="8" fill="#555">ALL RADII: R2 MAX</text>
+
+        <!-- Projection symbol -->
+        <text x="560" y="420" font-family="monospace" font-size="8" fill="#444">⊙ THIRD ANGLE PROJECTION</text>
+      </svg>
+
+      <!-- Scan overlay -->
+      <div class="scan-overlay">
+        <div class="scan-line" id="scan-line"></div>
+      </div>
+      <div class="analysis-badge" id="analysis-badge">
+        <div class="status-dot" style="width:6px;height:6px"></div>
+        LIVE ANALYSIS
+      </div>
+
+      <!-- Uploaded image view (shown when user uploads) -->
+      <div id="img-canvas-wrap">
+        <img id="uploaded-img" alt="Uploaded drawing"/>
+        <div id="detection-layer"></div>
+      </div>
+
+      <!-- Canvas tools -->
+      <div class="canvas-tools">
+        <button class="tool-btn active" title="Select" onclick="setTool('select')">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 2l4 10 2-4 4-2z"/></svg>
+        </button>
+        <button class="tool-btn" title="Pan" onclick="setTool('pan')">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="2"/><line x1="7" y1="1" x2="7" y2="4"/><line x1="7" y1="10" x2="7" y2="13"/><line x1="1" y1="7" x2="4" y2="7"/><line x1="10" y1="7" x2="13" y2="7"/></svg>
+        </button>
+        <button class="tool-btn" title="Zoom In" onclick="zoom(1.2)">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="6" r="4"/><line x1="9" y1="9" x2="13" y2="13"/><line x1="6" y1="4" x2="6" y2="8"/><line x1="4" y1="6" x2="8" y2="6"/></svg>
+        </button>
+        <button class="tool-btn" title="Zoom Out" onclick="zoom(0.8)">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="6" r="4"/><line x1="9" y1="9" x2="13" y2="13"/><line x1="4" y1="6" x2="8" y2="6"/></svg>
+        </button>
+        <button class="tool-btn" title="Reset View" onclick="resetZoom()">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="10" height="10" rx="1"/></svg>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- SIDEBAR RIGHT -->
+  <aside class="sidebar-right">
+    <div class="sr-tabs">
+      <div class="sr-tab active" onclick="setTab('info')">Info</div>
+      <div class="sr-tab" onclick="setTab('bom')">BOM</div>
+      <div class="sr-tab" onclick="setTab('ml')">ML Log</div>
+      <div class="sr-tab" onclick="setTab('train')">Train</div>
+    </div>
+    <div class="sr-content" id="sr-content">
+
+      <!-- INFO TAB -->
+      <div class="tab-panel active" id="tab-info">
+        <div class="info-section">
+          <div class="is-label">Selected Part</div>
+          <div id="selected-name" style="font-size:18px;font-weight:700;font-family:'Syne';color:var(--accent);margin-bottom:4px">Hover a part</div>
+          <div id="selected-type" style="font-size:11px;color:var(--text3);font-family:'DM Mono';margin-bottom:10px">— no selection —</div>
+          <div id="selected-chips"></div>
+        </div>
+        <div class="info-section" id="part-data-section" style="display:none">
+          <div class="is-label">Specifications</div>
+          <div id="part-data-rows"></div>
+        </div>
+        <div class="info-section" id="ml-scores-section" style="display:none">
+          <div class="is-label">ML Confidence Scores</div>
+          <div id="ml-scores-rows"></div>
+        </div>
+        <div class="info-section" id="related-section" style="display:none">
+          <div class="is-label">Related Parts</div>
+          <div id="related-chips"></div>
+        </div>
+        <div class="info-section" id="feedback-section" style="display:none">
+          <div class="is-label">Feedback (Self-Learning)</div>
+          <button class="feedback-btn" onclick="sendFeedback('correct')">✓ Prediction is correct</button>
+          <button class="feedback-btn" onclick="sendFeedback('wrong')">✗ Wrong identification</button>
+          <button class="feedback-btn" onclick="sendFeedback('partial')">~ Partially correct</button>
+        </div>
+      </div>
+
+      <!-- BOM TAB -->
+      <div class="tab-panel" id="tab-bom">
+        <div class="is-label" style="margin-bottom:10px">Bill of Materials</div>
+        <div id="bom-list"></div>
+      </div>
+
+      <!-- ML LOG TAB -->
+      <div class="tab-panel" id="tab-ml">
+        <div class="is-label" style="margin-bottom:10px">Analysis Log</div>
+        <div id="ml-log"></div>
+      </div>
+
+      <!-- TRAIN TAB -->
+      <div class="tab-panel" id="tab-train">
+        <div class="upload-zone" onclick="showNotif('Upload interface opening...')">
+          <div class="upload-icon">⊕</div>
+          <div class="upload-text">Add training drawings</div>
+          <div class="upload-sub">DXF · DWG · PDF · PNG · STEP</div>
+        </div>
+        <div class="is-label" style="margin-bottom:10px">Training Progress</div>
+        <div class="progress-row">
+          <div class="pr-label">Supervised</div>
+          <div class="pr-bar"><div class="pr-fill" style="width:78%;background:#00e5ff" id="pr-sup"></div></div>
+          <div class="pr-val">78%</div>
+        </div>
+        <div class="progress-row">
+          <div class="pr-label">Unsupervised</div>
+          <div class="pr-bar"><div class="pr-fill" style="width:61%;background:#7c3aed" id="pr-unsup"></div></div>
+          <div class="pr-val">61%</div>
+        </div>
+        <div class="progress-row">
+          <div class="pr-label">Self-Learn</div>
+          <div class="pr-bar"><div class="pr-fill" style="width:34%;background:#f59e0b" id="pr-self"></div></div>
+          <div class="pr-val">34%</div>
+        </div>
+        <div class="progress-row">
+          <div class="pr-label">Fusion</div>
+          <div class="pr-bar"><div class="pr-fill" style="width:88%;background:#10b981" id="pr-fuse"></div></div>
+          <div class="pr-val">88%</div>
+        </div>
+        <div class="is-label" style="margin-top:16px;margin-bottom:10px">Dataset Stats</div>
+        <div class="data-row"><span class="dr-key">Labelled samples</span><span class="dr-val">14,230</span></div>
+        <div class="data-row"><span class="dr-key">Unlabelled</span><span class="dr-val">8,917</span></div>
+        <div class="data-row"><span class="dr-key">New feedback</span><span class="dr-val" id="feedback-count">0</span></div>
+        <div class="data-row"><span class="dr-key">Last retrain</span><span class="dr-val">2h ago</span></div>
+        <div class="data-row"><span class="dr-key">Next auto-train</span><span class="dr-val">in 22h</span></div>
+        <button class="retrain-btn" onclick="triggerRetrain()">⟳ Trigger Retraining Now</button>
+      </div>
+
+    </div>
+  </aside>
+</div>
+
+<!-- Tooltip -->
+<div id="tooltip"><div class="tt-inner" id="tt-inner"></div></div>
+
+<!-- UPLOAD MODAL -->
+<div id="upload-modal">
+  <div class="modal-backdrop" onclick="closeUploadModal()"></div>
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title">Upload Mechanical Drawing</div>
+      <button class="modal-close" onclick="closeUploadModal()">✕</button>
+    </div>
+
+    <!-- Drop zone -->
+    <div id="drop-zone" onclick="document.getElementById('file-input').click()"
+         ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+      <div class="dz-icon">📐</div>
+      <div class="dz-title">Drop your drawing here</div>
+      <div class="dz-sub">or click to browse files from your device</div>
+      <div class="dz-formats">
+        <span class="fmt-chip">PNG</span><span class="fmt-chip">JPG / JPEG</span>
+        <span class="fmt-chip">PDF</span><span class="fmt-chip">SVG</span>
+        <span class="fmt-chip">DXF</span><span class="fmt-chip">DWG</span>
+        <span class="fmt-chip">BMP</span><span class="fmt-chip">TIFF</span>
+        <span class="fmt-chip">WEBP</span><span class="fmt-chip">GIF</span>
+      </div>
+      <button class="dz-btn" onclick="event.stopPropagation();document.getElementById('file-input').click()">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1" y="8" width="12" height="5" rx="1"/><path d="M4 5L7 2l3 3"/><line x1="7" y1="2" x2="7" y2="9"/></svg>
+        Browse Files
+      </button>
+      <input type="file" id="file-input" accept="image/*,.pdf,.svg,.dxf,.dwg,.bmp,.tiff,.tif,.webp"
+             onchange="handleFileSelect(this.files)"/>
+    </div>
+
+    <!-- Preview card (hidden until file selected) -->
+    <div id="upload-preview">
+      <div class="preview-card">
+        <div id="preview-thumb-wrap"></div>
+        <div class="preview-info">
+          <div class="preview-name" id="preview-name">—</div>
+          <div class="preview-meta" id="preview-meta">—</div>
+        </div>
+        <button class="preview-remove" onclick="clearFile()" title="Remove">✕</button>
+      </div>
+    </div>
+
+    <!-- Progress bar (hidden until analyse clicked) -->
+    <div id="modal-progress">
+      <div class="mp-label" id="mp-label">Preprocessing...</div>
+      <div class="mp-bar"><div class="mp-fill" id="mp-fill"></div></div>
+      <div class="mp-step" id="mp-step">Initialising ML pipeline...</div>
+    </div>
+
+    <!-- Analyse button -->
+    <button class="analyse-btn" id="analyse-btn" onclick="startAnalysis()" disabled>
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7.5" cy="7.5" r="6"/><line x1="7.5" y1="4" x2="7.5" y2="8"/><circle cx="7.5" cy="10" r=".8" fill="currentColor"/></svg>
+      Analyse Drawing
+    </button>
+  </div>
+</div>
+
+<!-- Notification -->
+<div class="notification" id="notification"></div>
+
+
+<!-- Upload Modal -->
+
+
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script src="js/upload.js"></script>
+<script>init();</script>
+</body>
+</html>
